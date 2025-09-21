@@ -56,8 +56,16 @@ def obtener_datos_mysql():
     print(df.dtypes)
     return df
 
+
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
+print('✅ Flask app inicializada')
+
+# Endpoint de prueba para verificar si la app responde
+@app.route('/ping', methods=['GET'])
+def ping():
+    print('✅ Ping recibido')
+    return 'pong', 200
 
 @app.route('/api/predict', methods=['POST'])
 def predecir():
