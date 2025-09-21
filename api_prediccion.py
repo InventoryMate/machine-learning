@@ -167,6 +167,3 @@ def predecir_mysql():
             'predicted_quantity': float(np.round(pred[0], 2))
         })
     return jsonify({'predictions': predicciones})
-
-if __name__ == '__main__':
-    app.run(debug=True)
