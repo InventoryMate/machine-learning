@@ -33,7 +33,7 @@ def preparar_df(df, base_columns=None):
     return X
 
 def obtener_datos_mysql():
-    engine = create_engine('mysql+pymysql://root:root@localhost/db_inventorymate')
+    engine = create_engine('mysql+pymysql://root:jiEpnqgeyQujFOHkuZwnnvgpidUMpiXq@hopper.proxy.rlwy.net:58023/railway')
     query = '''
     SELECT 
         od.id AS order_detail_id,
@@ -57,7 +57,7 @@ def obtener_datos_mysql():
     return df
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "http://localhost:8081"}})
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 @app.route('/api/predict', methods=['POST'])
 def predecir():

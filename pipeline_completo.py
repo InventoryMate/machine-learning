@@ -188,6 +188,13 @@ print(f"\n📊 Evaluación en Validación:")
 print(f"R² estándar: {r2_score(y_val, y_pred):.3f}")
 print(f"MAE: {mean_absolute_error(y_val, y_pred):.3f}")
 
+# --- Métricas adicionales ---
+from sklearn.metrics import mean_squared_error, median_absolute_error, explained_variance_score
+
+# SMAPE: Error Porcentual Absoluto Medio Simétrico
+smape = 100 * np.mean(2 * np.abs(y_pred - y_val) / (np.abs(y_val) + np.abs(y_pred) + 1e-8))
+print(f"SMAPE: {smape:.2f}%")
+
 print("\n--- Iniciando Etapa 4: Visualización de predicciones ---")
 val_df_export = val_df[['fecha', 'producto', 'cantidad', 'prediccion_redondeada']].copy()
 val_df_export.rename(columns={'prediccion_redondeada': 'predicho'}, inplace=True)
