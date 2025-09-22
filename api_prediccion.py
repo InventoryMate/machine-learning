@@ -190,6 +190,6 @@ def predecir_mysql():
         })
     return jsonify({'predictions': predicciones})
 
-#if __name__ == "__main__":
- #   port = int(os.environ.get("PORT", 8080))  # Usa el puerto que Railway define
-  #  app.run(host="0.0.0.0", port=port, debug=False)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8080))  # Usa el puerto que Railway define
+    app.run(host="0.0.0.0", port=port, debug=False)
