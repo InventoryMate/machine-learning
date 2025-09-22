@@ -5,6 +5,7 @@ import xgboost as xgb
 import joblib
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import os
 import pymysql
 
 best_model = joblib.load('mejor_modelo.pkl')
@@ -175,3 +176,7 @@ def predecir_mysql():
             'predicted_quantity': float(np.round(pred[0], 2))
         })
     return jsonify({'predictions': predicciones})
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
