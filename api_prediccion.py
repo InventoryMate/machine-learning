@@ -8,6 +8,13 @@ from flask_cors import CORS
 import os
 import pymysql
 
+print("Iniciando carga de modelo...")
+try:
+    best_model = joblib.load('mejor_modelo.pkl')
+    print("✅ Modelo cargado correctamente")
+except Exception as e:
+    print("❌ Error cargando modelo:", e)
+
 best_model = joblib.load('mejor_modelo.pkl')
 
 cat_cols = ['producto']
