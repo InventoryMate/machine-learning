@@ -41,28 +41,34 @@ def preparar_df(df, base_columns=None):
     return X
 
 def obtener_datos_mysql():
-    engine = create_engine('mysql+pymysql://root:jiEpnqgeyQujFOHkuZwnnvgpidUMpiXq@hopper.proxy.rlwy.net:58023/railway')
-    query = '''
-    SELECT 
-        od.id AS order_detail_id,
-        o.order_date,
-        p.product_name,
-        od.quantity
-    FROM 
-        order_details od
-    JOIN 
-        `orders` o ON od.order_id = o.id
-    JOIN 
-        products p ON od.product_id = p.id
-    ORDER BY 
-        o.order_date ASC;
-    '''
-    df = pd.read_sql(query, engine)
-    print('=== CONTENIDO REAL DEL DATAFRAME ===')
-    print(df.head(20))
-    print('=== TIPOS DE DATOS ===')
-    print(df.dtypes)
-    return df
+    
+    try:
+        engine = create_engine('mysql+pymysql://root:jiEpnqgeyQujFOHkuZwnnvgpidUMpiXq@hopper.proxy.rlwy.net:58023/railway')
+        print("✅ Conexión a la base de datos exitosa")    
+        query = '''
+        SELECT 
+            od.id AS order_detail_id,
+            o.order_date,
+            p.product_name,
+            od.quantity
+        FROM 
+            order_details od
+        JOIN 
+            `orders` o ON od.order_id = o.id
+        JOIN 
+            products p ON od.product_id = p.id
+        ORDER BY 
+            o.order_date ASC;
+        '''
+        df = pd.read_sql(query, engine)
+        print('=== CONTENIDO REAL DEL DATAFRAME ===')
+        print(df.head(20))
+        print('=== TIPOS DE DATOS ===')
+        print(df.dtypes)
+        return df
+    except Exception as e:
+        print("❌ Error al conectar a la base de datos:", e)
+        return pd.DataFrame() 
 
 
 app = Flask(__name__)
@@ -184,6 +190,6 @@ def predecir_mysql():
         })
     return jsonify({'predictions': predicciones})
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))  # Usa el puerto que Railway define
-    app.run(host="0.0.0.0", port=port, debug=False)
+#if __name__ == "__main__":
+ #   port = int(os.environ.get("PORT", 8080))  # Usa el puerto que Railway define
+  #  app.run(host="0.0.0.0", port=port, debug=False)
