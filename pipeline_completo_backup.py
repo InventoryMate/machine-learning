@@ -90,6 +90,9 @@ def crear_vars_lag_rolling(df, window=3):
     df['cantidad_lag_1'] = df.groupby('producto')['cantidad'].shift(1)
     df['cantidad_rolling_mean_3'] = df.groupby('producto')['cantidad'].rolling(window=window).mean().reset_index(0, drop=True)
     df['cantidad_rolling_std_3'] = df.groupby('producto')['cantidad'].rolling(window=window).std().reset_index(0, drop=True)
+    df['cantidad_log_lag_1'] = df.groupby('producto')['cantidad_log'].shift(1)
+    df['cantidad_log_rolling_mean_3'] = df.groupby('producto')['cantidad_log'].rolling(window=window).mean().reset_index(0, drop=True)
+    df['cantidad_log_rolling_std_3'] = df.groupby('producto')['cantidad_log'].rolling(window=window).std().reset_index(0, drop=True)
     return df
 
 train_df = crear_vars_lag_rolling(train_df)
@@ -103,9 +106,11 @@ num_cols = [
     'valor_unitario',
     'cantidad_lag_1',
     'cantidad_rolling_mean_3',
-    'cantidad_rolling_std_3'
+    'cantidad_rolling_std_3',
+    'cantidad_log_lag_1',
+    'cantidad_log_rolling_mean_3',
+    'cantidad_log_rolling_std_3'
 ]
-
 
 def preparar_df(df, base_columns=None):
     X_cat = pd.get_dummies(df[cat_cols], drop_first=True)
@@ -139,7 +144,7 @@ def objective(trial):
     return scores.mean()
 
 study = optuna.create_study(direction='maximize', sampler=optuna.samplers.TPESampler(seed=random_state_used))
-study.optimize(objective, n_trials=200)
+study.optimize(objective, n_trials=100)
 
 print("\n✅ Mejores hiperparámetros encontrados:")
 best_params = study.best_params

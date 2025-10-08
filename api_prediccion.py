@@ -7,23 +7,26 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pymysql
 
+# Cargar el modelo entrenado
 best_model = joblib.load('mejor_modelo.pkl')
 
+# Columnas categóricas y numéricas
 cat_cols = ['producto']
 num_cols = [
     'valor_unitario',
     'cantidad_lag_1',
     'cantidad_rolling_mean_3',
-    'cantidad_rolling_std_3',
     'cantidad_log_lag_1',
-    'cantidad_log_rolling_mean_3',
-    'cantidad_log_rolling_std_3'
+    'cantidad_log_rolling_mean_3'
 ]
+
+# Intentar obtener las columnas del modelo
 try:
     input_columns = best_model.feature_names_in_.tolist()
 except AttributeError:
-    input_columns = num_cols 
+    input_columns = num_cols
 
+# Función para preparar el DataFrame de entrada
 def preparar_df(df, base_columns=None):
     X_cat = pd.get_dummies(df[cat_cols], drop_first=True)
     X_num = df[num_cols].reset_index(drop=True)
@@ -32,6 +35,7 @@ def preparar_df(df, base_columns=None):
         X = X.reindex(columns=base_columns, fill_value=0)
     return X
 
+# Conexión a MySQL
 def obtener_datos_mysql():
     engine = create_engine('mysql+pymysql://root:root@localhost/db_inventorymate')
     query = '''
@@ -56,9 +60,11 @@ def obtener_datos_mysql():
     print(df.dtypes)
     return df
 
+# Configuración del servidor Flask
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:8081"}})
 
+# Endpoint principal de predicción
 @app.route('/api/predict', methods=['POST'])
 def predecir():
     data = request.get_json()
@@ -66,86 +72,99 @@ def predecir():
     products = data.get('products', [])
     start_date = data.get('date')
     season = data.get('season')
+
     results = []
     df_hist = obtener_datos_mysql()
+
     print("[API INPUT]", data)
-    df_hist = obtener_datos_mysql()
     print(f"[MYSQL RESULT] shape: {df_hist.shape}, columns: {df_hist.columns.tolist()}")
+
     if not df_hist.empty:
         print(df_hist.head(10).to_string(index=False))
     else:
         print("[MYSQL RESULT] El DataFrame está vacío. No se encontraron datos.")
+
     df_hist = df_hist.sort_values(['product_name', 'order_date'])
+
     for prod in products:
         product_name = prod.get('productName')
         price = prod.get('price', 0)
+
         subdf = df_hist[df_hist['product_name'] == product_name].copy()
         if subdf.empty:
             continue
+
+        # Cálculo de variables de entrada (sin las eliminadas)
         subdf['cantidad_lag_1'] = subdf['quantity'].shift(1)
         subdf['cantidad_rolling_mean_3'] = subdf['quantity'].rolling(3, min_periods=1).mean()
-        subdf['cantidad_rolling_std_3'] = subdf['quantity'].rolling(3, min_periods=1).std().fillna(0)
         subdf['cantidad_log_lag_1'] = np.log1p(subdf['cantidad_lag_1'].fillna(0))
         subdf['cantidad_log_rolling_mean_3'] = np.log1p(subdf['cantidad_rolling_mean_3'])
-        subdf['cantidad_log_rolling_std_3'] = np.log1p(subdf['cantidad_rolling_std_3'])
+
         historial_pred = subdf.tail(3).copy()
         daily_predictions = []
         predicted_total = 0
+
         for i in range(days):
             current_date = pd.to_datetime(start_date) + pd.Timedelta(days=i+1)
             dia_semana_map = {0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves', 4: 'Viernes', 5: 'Sábado', 6: 'Domingo'}
             dia_semana_str = dia_semana_map[current_date.weekday()]
+
             ultimos = historial_pred['quantity'].values[-3:] if len(historial_pred) >= 1 else [0, 0, 0]
             lag_1 = ultimos[-1] if len(ultimos) > 0 else 0
             rolling_mean_3 = np.mean(ultimos)
-            rolling_std_3 = np.std(ultimos)
             log_lag_1 = np.log1p(lag_1)
             log_rolling_mean_3 = np.log1p(rolling_mean_3)
-            log_rolling_std_3 = np.log1p(rolling_std_3) if rolling_std_3 > 0 else 0
+
             row = {
                 'producto': product_name,
                 'valor_unitario': price,
                 'cantidad_lag_1': lag_1,
                 'cantidad_rolling_mean_3': rolling_mean_3,
-                'cantidad_rolling_std_3': rolling_std_3,
                 'cantidad_log_lag_1': log_lag_1,
                 'cantidad_log_rolling_mean_3': log_rolling_mean_3,
-                'cantidad_log_rolling_std_3': log_rolling_std_3,
                 'dia_semana': dia_semana_str,
                 'estacion': season
             }
+
             df_input = pd.DataFrame([row])
             X_input = preparar_df(df_input, base_columns=input_columns)
             pred = best_model.predict(X_input)
+
             pred_redondeado = float(np.round(pred[0], 2))
             pred_redondeado = max(pred_redondeado, 0)
             pred_date = current_date.strftime('%Y-%m-%d')
+
             daily_predictions.append({
                 'date': pred_date,
                 'predicted_quantity': pred_redondeado
             })
+
             predicted_total += pred_redondeado
+
             historial_pred = pd.concat([
                 historial_pred,
                 pd.DataFrame({'quantity': [pred_redondeado]}, index=[current_date])
             ])
+
         results.append({
             'product_id': product_name,
             'predicted_total': float(np.round(predicted_total, 2)),
             'daily_predictions': daily_predictions
         })
+
     return jsonify({'predictions': results})
 
+# Endpoint de prueba directa desde MySQL
 @app.route('/api/predict-mysql', methods=['GET'])
 def predecir_mysql():
     df = obtener_datos_mysql()
     df = df.sort_values(['product_name', 'order_date'])
+
     df['cantidad_lag_1'] = df.groupby('product_name')['quantity'].shift(1)
     df['cantidad_rolling_mean_3'] = df.groupby('product_name')['quantity'].rolling(3, min_periods=1).mean().reset_index(0, drop=True)
-    df['cantidad_rolling_std_3'] = df.groupby('product_name')['quantity'].rolling(3, min_periods=1).std().reset_index(0, drop=True).fillna(0)
     df['cantidad_log_lag_1'] = np.log1p(df['cantidad_lag_1'].fillna(0))
     df['cantidad_log_rolling_mean_3'] = np.log1p(df['cantidad_rolling_mean_3'])
-    df['cantidad_log_rolling_std_3'] = np.log1p(df['cantidad_rolling_std_3'])
+
     predicciones = []
     for prod, subdf in df.groupby('product_name'):
         row = subdf.iloc[-1]
@@ -154,10 +173,8 @@ def predecir_mysql():
             'valor_unitario': 0, 
             'cantidad_lag_1': row['cantidad_lag_1'],
             'cantidad_rolling_mean_3': row['cantidad_rolling_mean_3'],
-            'cantidad_rolling_std_3': row['cantidad_rolling_std_3'],
             'cantidad_log_lag_1': row['cantidad_log_lag_1'],
-            'cantidad_log_rolling_mean_3': row['cantidad_log_rolling_mean_3'],
-            'cantidad_log_rolling_std_3': row['cantidad_log_rolling_std_3']
+            'cantidad_log_rolling_mean_3': row['cantidad_log_rolling_mean_3']
         }
         df_input = pd.DataFrame([row_dict])
         X_input = preparar_df(df_input, base_columns=input_columns)
@@ -168,5 +185,6 @@ def predecir_mysql():
         })
     return jsonify({'predictions': predicciones})
 
+# Ejecutar servidor Flask
 if __name__ == '__main__':
     app.run(debug=True)
